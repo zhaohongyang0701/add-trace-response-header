@@ -1,4 +1,4 @@
-package traefik_plugin_add_response_header
+package add_trace_response_header
 
 import (
 	"context"
