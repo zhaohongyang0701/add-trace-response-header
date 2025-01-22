@@ -1,4 +1,4 @@
-module github.com/zhaohongyang0701/add_trace_response_header
+module github.com/zhaohongyang0701/add-trace-response-header
 
 go 1.19
 
