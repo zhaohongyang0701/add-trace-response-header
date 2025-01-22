@@ -8,7 +8,6 @@ import (
 	"io"
 	"net"
 	"net/http"
-	"reflect"
 	"regexp"
 )
 
@@ -73,43 +72,61 @@ func (w *wrappedResponseWriter) Hijack() (net.Conn, *bufio.ReadWriter, error) {
 	return hijacker.Hijack()
 }
 
+// CustomContext 是一个实现了 context.Context 接口的自定义类型
+type CustomContext struct {
+	context.Context
+	values map[interface{}]interface{}
+}
+
+// NewCustomContext 创建一个新的 CustomContext
+func NewCustomContext(parent context.Context) *CustomContext {
+	return &CustomContext{
+		Context: parent,
+		values:  make(map[interface{}]interface{}),
+	}
+}
+
+// WithValue 用于设置键值对
+func (c *CustomContext) WithValue(key, value interface{}) *CustomContext {
+	c.values[key] = value
+	return c
+}
+
+// Value 获取键对应的值
+func (c *CustomContext) Value(key interface{}) interface{} {
+	if val, exists := c.values[key]; exists {
+		return val
+	}
+	return c.Context.Value(key)
+}
+
+// 打印所有键值对
+func (c *CustomContext) PrintValues() {
+	fmt.Println("Context values:")
+	for key, val := range c.values {
+		fmt.Printf("Key: %v, Value: %v\n", key, val)
+	}
+}
+
 func (p *plugin) ServeHTTP(w http.ResponseWriter, req *http.Request) {
+	// 使用自定义的 CustomContext
+	ctx := NewCustomContext(req.Context())
+
+	// 打印所有 context 中的值
+	ctx.PrintValues()
+
+	// 在自定义 context 中设置一个新的值
+	ctx = ctx.WithValue("newKey", "newValue")
+
+	// 打印更新后的 context 值
+	ctx.PrintValues()
+
 	resp := &wrappedResponseWriter{
 		w:    w,
 		buf:  &bytes.Buffer{},
 		code: 200,
 	}
 	defer resp.Flush()
-
-	// 添加打印Context值的代码
-	ctx := req.Context()
-	fmt.Printf("Context values for request:\n")
-	ctx.Value(struct{}{}) // 触发遍历所有值
-	type ctxKey struct{}
-	ctx = context.WithValue(ctx, ctxKey{}, nil)
-	prevCtx := ctx
-	for {
-		if ctx == nil {
-			break
-		}
-		v := reflect.ValueOf(ctx).Elem()
-		if v.Kind() == reflect.Struct {
-			for i := 0; i < v.NumField(); i++ {
-				if v.Field(i).CanInterface() {
-					if key := v.Type().Field(i).Name; key == "key" {
-						keyValue := v.Field(i).Interface()
-						valValue := v.FieldByName("val").Interface()
-						fmt.Printf("Key: %v, Value: %v\n", keyValue, valValue)
-					}
-				}
-			}
-		}
-		ctx = reflect.ValueOf(ctx).Elem().FieldByName("Context").Interface().(context.Context)
-		if ctx == prevCtx {
-			break
-		}
-		prevCtx = ctx
-	}
 
 	p.next.ServeHTTP(resp, req)
 
