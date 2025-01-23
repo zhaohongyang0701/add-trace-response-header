@@ -9,8 +9,6 @@ import (
 	"net"
 	"net/http"
 	"regexp"
-
-	"go.opentelemetry.io/otel/trace"
 )
 
 var (
@@ -111,12 +109,17 @@ func (c *CustomContext) PrintValues() {
 }
 
 func (p *plugin) ServeHTTP(w http.ResponseWriter, req *http.Request) {
-	var traceid string
-	spanContext := trace.SpanContextFromContext(req.Context())
-	if spanContext.IsValid() {
-		traceid = spanContext.TraceID().String() // 返回 trace ID 的字符串表示
-		fmt.Printf("trace: %v\n", traceid)
-	}
+	// 使用自定义的 CustomContext
+	ctx := NewCustomContext(req.Context())
+
+	// 打印所有 context 中的值
+	ctx.PrintValues()
+
+	// 在自定义 context 中设置一个新的值
+	ctx = ctx.WithValue("newKey", "newValue")
+
+	// 打印更新后的 context 值
+	ctx.PrintValues()
 
 	resp := &wrappedResponseWriter{
 		w:    w,
@@ -145,10 +148,11 @@ func (p *plugin) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 			match,
 		)
 	}
-	if traceid != "" {
-		resp.Header().Set(p.config.To, traceid)
+	if len(replacement) > 0 {
+		if traceID, ok := req.Context().Value("tracing.traceID").(string); ok {
+			resp.Header().Set(p.config.To, traceID)
+		}
 	}
-
 }
 
 func New(_ context.Context, next http.Handler, config *Config, name string) (http.Handler, error) {
