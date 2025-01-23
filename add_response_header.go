@@ -109,18 +109,8 @@ func (c *CustomContext) PrintValues() {
 }
 
 func (p *plugin) ServeHTTP(w http.ResponseWriter, req *http.Request) {
-	// 使用自定义的 CustomContext
-	ctx := NewCustomContext(req.Context())
-
-	// 打印所有 context 中的值
-	ctx.PrintValues()
-
-	// 在自定义 context 中设置一个新的值
-	ctx = ctx.WithValue("newKey", "newValue")
-
-	// 打印更新后的 context 值
-	ctx.PrintValues()
-
+	src11 := req.Header.Get("traceparent")
+	fmt.Println("testtrace: " + src11)
 	resp := &wrappedResponseWriter{
 		w:    w,
 		buf:  &bytes.Buffer{},
